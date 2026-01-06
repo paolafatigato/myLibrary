@@ -2,12 +2,12 @@
         /* --- 1. CORE VARIABLES & RESET --- */
         :root {
             --shelf-height: 320px;
-            --shelf-depth: #e99fc8;
+            --shelf-depth: #fef4f9;
             --shelf-wood: #8d6e63;
             --bg-color: #f4f4f9;
             --text-color: #333;
             --ui-font: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            --book-default-color: #9e9e9e;
+            --book-default-color: #5b5e74;
             
             /* Dynamic Book Variables (Overridden by JS) */
             --book-h: 200px;
@@ -59,7 +59,7 @@
         }
 
         .shelf {
-            background: linear-gradient(to bottom, var(--shelf-depth) 0%, #9e9e9e 90%, var(--shelf-wood) 90%, var(--shelf-wood) 100%);
+            background: linear-gradient(to bottom, var(--shelf-depth) 0%, #eee 90%, var(--shelf-wood) 90%, var(--shelf-wood) 100%);
             height: var(--shelf-height);
             border-bottom: 10px solid var(--shelf-wood);
             display: flex;
