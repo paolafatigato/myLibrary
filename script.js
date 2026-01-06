@@ -13,9 +13,12 @@ const CONFIG = {
 // Global State
 let state = {
     books: [],           // Enriched book objects
-    layout: [[], [], []], // Array of arrays (Shelf 0, 1, 2) containing book IDs
+    shelves: [],     
+    //layout: [[], [], []],  Array of arrays (Shelf 0, 1, 2) containing book IDs
     selectedBookId: null
 };
+
+const libraryContainer = document.getElementById('library-container');
 
 /**
  * --- 1. DATA LOGIC ---
@@ -239,75 +242,113 @@ console.log(
 /**
  * --- 4. RENDERER & INTERACTION ---
  */
-const libraryContainer = document.getElementById('library-container');
+
+function renderShelves() {
+  libraryContainer.innerHTML = "";
+
+  state.shelves.forEach(shelf => {
+    // wrapper scaffale
+    const wrapper = document.createElement("div");
+    wrapper.className = "shelf-wrapper";
+    wrapper.dataset.shelfId = shelf.id;
+    wrapper.draggable = true;
+    wrapper.classList.add("shelf-draggable");
+
+
+    // titolo scaffale
+    const title = document.createElement("h3");
+    title.textContent = shelf.name;
+    title.className = "shelf-title";
+
+// 🔑 TUTTI gli scaffali sono rinominabili
+title.contentEditable = true;
+
+title.addEventListener("blur", () => {
+  const newName = title.textContent.trim();
+  if (newName !== "") {
+    shelf.name = newName;
+  } else {
+    title.textContent = shelf.name; // evita nome vuoto
+  }
+
+  wrapper.addEventListener("dragstart", e => {
+  draggedShelfId = shelf.id;
+  wrapper.classList.add("dragging-shelf");
+  e.dataTransfer.effectAllowed = "move";
+});
+wrapper.addEventListener("dragend", () => {
+  draggedShelfId = null;
+  wrapper.classList.remove("dragging-shelf");
+  updateShelvesOrderFromDOM();
+});
+
+
+});
+
+libraryContainer.addEventListener("dragover", e => {
+  e.preventDefault();
+
+  const dragging = document.querySelector(".dragging-shelf");
+  if (!dragging) return;
+
+  const after = getShelfAfterElement(libraryContainer, e.clientY);
+  if (after == null) {
+    libraryContainer.appendChild(dragging);
+  } else {
+    libraryContainer.insertBefore(dragging, after);
+  }
+});
+
+    // scaffale vero e proprio
+    const shelfEl = document.createElement("div");
+    shelfEl.className = "shelf";
+
+    shelf.bookIds.forEach(bookId => {
+      const book = state.books.find(b => b.id === bookId);
+      if (!book) return;
+
+      const el = document.createElement("div");
+      el.className = "book";
+      el.dataset.id = book.id;
+      el.draggable = true;
+
+      // dimensioni
+      el.style.setProperty("--book-h", `${book.renderHeight}px`);
+      el.style.setProperty("--book-w", `${book.renderWidth}px`);
+
+      // colore solo se scelto dall’utente
+      if (book.isUserColor && book.displayColor) {
+        el.style.setProperty("--book-c", book.displayColor);
+      } else {
+        el.style.removeProperty("--book-c");
+      }
+
+      el.innerHTML = `<span>${book.title}</span>`;
+
+      // eventi
+      el.addEventListener("dragstart", handleDragStart);
+      el.addEventListener("dragend", handleDragEnd);
+      el.addEventListener("click", e => showDetails(book, e));
+
+      shelfEl.appendChild(el);
+    });
+
+    wrapper.appendChild(title);
+    wrapper.appendChild(shelfEl);
+    libraryContainer.appendChild(wrapper);
+
+    // 🔑 gradiente cromatico PER SCAFFALE
+    ColorEngine.updateShelfColors(shelfEl);
+  });
+}
 
 // Drag State
 let draggedItem = null;
 let sourceShelf = null;
 
-function renderLibrary() {
-  // Clear shelves
-  document.querySelectorAll('.shelf').forEach(s => s.innerHTML = '');
-
-  state.layout.forEach((shelfIds, shelfIndex) => {
-    const shelfEl = document.querySelector(
-      `.shelf[data-shelf-id="${shelfIndex}"]`
-    );
-
-    shelfIds.forEach(bookId => {
-      const book = state.books.find(b => b.id === bookId);
-      if (!book) return;
-
-      const el = document.createElement('div');
-      el.className = 'book';
-      el.dataset.id = book.id;
-      el.draggable = true;
-
-      // Geometry (always JS)
-      el.style.setProperty('--book-h', `${book.renderHeight}px`);
-      el.style.setProperty('--book-w', `${book.renderWidth}px`);
-
-      // 🔑 COLOR LOGIC (CORRETTA)
-      // Se il libro ha un colore esplicito → lo imposto
-      // Altrimenti → lascio decidere al CSS
-      if (book.displayColor) {
-        el.style.setProperty('--book-c', book.displayColor);
-      } else {
-        el.style.removeProperty('--book-c');
-      }
-
-      el.innerHTML = `<span>${book.title}</span>`;
-
-      // Events
-      el.addEventListener('dragstart', handleDragStart);
-      el.addEventListener('dragend', handleDragEnd);
-      el.addEventListener('click', (e) => showDetails(book, e));
-
-      shelfEl.appendChild(el);
-    });
-
-    // Apply gradients AFTER all books are placed
-    ColorEngine.updateShelfColors(shelfEl);
-  });
-}
+let draggedShelfId = null;
 
 
-function updateLayoutFromDOM() {
-    // Reconstruct state.layout based on current DOM positions
-    // This allows manual ordering to persist
-    const newLayout = [];
-    document.querySelectorAll('.shelf').forEach(shelf => {
-        const ids = [];
-        shelf.querySelectorAll('.book').forEach(book => {
-            ids.push(parseInt(book.dataset.id));
-        });
-        newLayout.push(ids);
-    });
-    state.layout = newLayout;
-    
-    // Re-run color logic on all shelves because order changed
-    document.querySelectorAll('.shelf').forEach(s => ColorEngine.updateShelfColors(s));
-}
 
 /* --- Drag and Drop Handlers --- */
 
@@ -366,34 +407,18 @@ function getDragAfterElement(container, x) {
     }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
+function getShelfAfterElement(container, y) {
+  const shelves = [...container.querySelectorAll(".shelf-wrapper:not(.dragging-shelf)")];
 
-/* --- Controls & Logic --- */
+  return shelves.reduce((closest, el) => {
+    const box = el.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
 
-function applySorting(mode) {
-    // 1. Flatten current books
-    const allIds = state.books.map(b => b.id); // Or get current visible? Let's use all.
-    
-    // 2. Get full object list
-    const bookObjects = allIds.map(id => state.books.find(b => b.id === id));
-    
-    // 3. Sort
-    const sorted = Sorter.getSortedBooks(bookObjects, mode);
-    
-    // 4. Distribute into shelves (simple fill)
-    // Clear layout
-    state.layout = [[], [], []];
-    const shelfCap = Math.ceil(sorted.length / 3);
-    
-    sorted.forEach((book, i) => {
-        const shelfIdx = Math.floor(i / shelfCap);
-        if (state.layout[shelfIdx]) {
-            state.layout[shelfIdx].push(book.id);
-        } else {
-            state.layout[state.layout.length - 1].push(book.id); // Overflow
-        }
-    });
-
-    renderLibrary();
+    if (offset < 0 && offset > closest.offset) {
+      return { offset, element: el };
+    }
+    return closest;
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
 /* --- Detail & Color Picker --- */
@@ -455,73 +480,82 @@ document.getElementById('btn-reset-color').addEventListener('click', () => {
 
   book.displayColor = null;
   book.isUserColor = false; // 🔑
-  renderLibrary();
+  state.shelves = buildGenreShelves(state.books);
+renderShelves();
+
 });
 
 
 
 /* --- UI Buttons --- */
 
-document.getElementById('sort-mode').addEventListener('change', (e) => {
-    const mode = e.target.value;
-    if (mode !== 'none') applySorting(mode);
+document.getElementById("btn-add-shelf").addEventListener("click", () => {
+  createManualShelf();
 });
 
-document.getElementById('btn-save').addEventListener('click', () => {
-    updateLayoutFromDOM(); // Ensure state is fresh
-    // We save the layout IDs and the book states (to capture manual color changes)
-    const savePacket = {
-        layout: state.layout,
-        bookColors: state.books.map(b => ({id: b.id, color: b.displayColor}))
-    };
-    localStorage.setItem('library_layout', JSON.stringify(savePacket));
-    alert('Layout saved!');
-});
-
-document.getElementById('btn-load').addEventListener('click', () => {
-    const saved = localStorage.getItem('library_layout');
-    if (saved) {
-        const parsed = JSON.parse(saved);
-        state.layout = parsed.layout;
-        
-        // Restore manual colors
-        parsed.bookColors.forEach(savedBook => {
-            const current = state.books.find(b => b.id === savedBook.id);
-            if (current) current.displayColor = savedBook.color;
-        });
-        
-        renderLibrary();
-        document.getElementById('sort-mode').value = 'none';
-    } else {
-        alert('No saved layout found.');
-    }
-});
 
 document.getElementById('btn-reset').addEventListener('click', () => {
     localStorage.clear();
     location.reload();
 });
 
+function buildGenreShelves(books) {
+  const map = new Map();
+
+  books.forEach(book => {
+    const genre = book.genre || "Altro";
+    if (!map.has(genre)) {
+      map.set(genre, {
+        id: `genre-${genre}`,
+        name: genre,
+        type: "genre",
+        bookIds: []
+      });
+    }
+    map.get(genre).bookIds.push(book.id);
+  });
+
+  return Array.from(map.values());
+}
+
+function createManualShelf(name = "Nuovo scaffale") {
+  state.shelves.push({
+    id: `manual-${crypto.randomUUID()}`,
+    name,
+    type: "manual",
+    bookIds: []
+  });
+
+  renderShelves();
+}
+
+function updateShelvesOrderFromDOM() {
+  const newOrder = [];
+
+  document.querySelectorAll(".shelf-wrapper").forEach(wrapper => {
+    const id = wrapper.dataset.shelfId;
+    const shelf = state.shelves.find(s => s.id === id);
+    if (shelf) newOrder.push(shelf);
+  });
+
+  state.shelves = newOrder;
+}
+
+
 
 /**
  * --- INITIALIZATION ---
  */
 document.addEventListener("booksLoaded", () => {
-  // 1. inizializza i libri
+  // 1️⃣ inizializza i libri
   state.books = DataManager.init(rawData);
 
-  // 2. CREA UN LAYOUT INIZIALE (QUESTO MANCAVA)
-  state.layout = [[], [], []];
-  state.books.forEach((book, index) => {
-    state.layout[index % 3].push(book.id);
-  });
+  // 2️⃣ crea scaffali automatici per genere
+  state.shelves = buildGenreShelves(state.books);
 
-  // 3. RENDER (QUESTO È IL PASSAGGIO CRITICO)
-  renderLibrary();
-
-  // 4. ordinamento iniziale
-  applySorting("hybrid");
-  document.getElementById("sort-mode").value = "hybrid";
+  // 3️⃣ render UNICO
+  renderShelves();
 });
+
 
 
