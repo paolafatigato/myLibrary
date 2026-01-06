@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Visual Classification Library</title>
+
+  <!-- STYLES -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- UI CONTROLS -->
+  <div class="controls">
+    <h3>Library OS</h3>
+
+    <label for="sort-mode">Ordering Mode:</label>
+    <select id="sort-mode">
+      <option value="none">Manual / Custom</option>
+      <option value="author">By Author</option>
+      <option value="similarity">By Similarity</option>
+      <option value="hybrid">Hybrid</option>
+    </select>
+
+    <button id="btn-save">Save Layout</button>
+    <button id="btn-load">Load Saved</button>
+    <button id="btn-reset">Reset Data</button>
+
+    <small class="hint">Drag books to move. Click to edit color.</small>
+  </div>
+
+  <!-- LIBRARY -->
+  <div id="library-container">
+    <div class="shelf" data-shelf-id="0"></div>
+    <div class="shelf" data-shelf-id="1"></div>
+    <div class="shelf" data-shelf-id="2"></div>
+  </div>
+
+  <!-- DETAILS MODAL -->
+  <div id="details-modal">
+    <h3 id="modal-title"></h3>
+    <p id="modal-author"></p>
+    <div id="modal-tags"></div>
+
+    <div class="color-picker-wrapper">
+      <label>Override Color</label>
+      <input type="color" id="color-override">
+      <button id="btn-reset-color">Reset</button>
+    </div>
+  </div>
+
+  <!-- DATA + LOGIC -->
+  <script src="books.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
